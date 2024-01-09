@@ -157,70 +157,6 @@ dnl library version
 AC_SUBST(FREEJ_VERSION_INFO)
 
 
-dnl ==============================================================
-dnl check for swig and whether to enable bindings
-dnl ==============================================================
-AC_PROG_SWIG([1.3])
-SWIG_ENABLE_CXX
-
-if test -z "$SWIG_LIB"; then
-    have_swig=no
-
-    AC_MSG_WARN([No language bindings will be created])
-else
-    have_swig=yes
-
-    SWIG_COMMAND='$(SWIG) -c++ -O -Wall -I$(top_builddir) -I$(top_srcdir)/src/include -I$(top_builddir)/doc'
-    AC_SUBST(SWIG_COMMAND)
-    SWIG_IFACE='$(top_srcdir)/bindings/freej.i'
-    AC_SUBST(SWIG_IFACE)
-
-AC_ARG_ENABLE(python,
-    AS_HELP_STRING([--enable-python],[enable Python bindings (no)]),
-	[enable_python=$enableval],
-	[enable_python=no])
-
-    if test x"$enable_python" = xyes; then
-	AC_PYTHON_DEVEL
-	AM_PATH_PYTHON([$ac_python_version])
-	AC_SUBST([SWIG_PYTHON_OPT],[-python$swig_shadow])
-	AC_SUBST([SWIG_PYTHON_CPPFLAGS],[$PYTHON_CPPFLAGS])
-
-    fi
-
-
-#    ENABLE_SWIG_PYTHON
-    ENABLE_SWIG_RUBY
-    ENABLE_SWIG_JAVA
-    ENABLE_SWIG_PERL
-
-    if test x$enable_perl = xyes; then
-      AC_CHECK_FUNCS([strtoul])
-      AC_FUNC_STRTOD
-    fi
-fi
-
-AM_CONDITIONAL([BUILD_SWIG_PYTHON], [test x$enable_python = xyes])
-AM_CONDITIONAL([BUILD_SWIG_RUBY], [test x$enable_ruby = xyes])
-AM_CONDITIONAL([BUILD_SWIG_JAVA], [test x$enable_java = xyes])
-AM_CONDITIONAL([BUILD_SWIG_PERL], [test x$enable_perl = xyes])
-
-dnl swig not found but bindings requested is fatal
-if test x$have_swig = xno && {
-      test x$enable_python = xyes ||
-      test x$enable_java = xyes   ||
-      test x$enable_ruby = xyes   ||
-      test x$enable_perl = xyes
-   }; then
-    AC_MSG_ERROR([*** bindings requested but swig not found!])
-fi
-
-if test x$enable_python = xyes; then
-   AC_CHECK_PROG([DOXYGEN], [doxygen], [doxygen])
-   if test -z "$DOXYGEN"; then
-      AC_MSG_ERROR([*** Doxygen is required to build python docstrings.])
-   fi
-fi
 
 dnl ==============================================================
 dnl Add the local include path and some flags
@@ -831,7 +767,7 @@ dnl ==============================================================
 PKG_CHECK_MODULES([SDLIMAGE], [SDL_image],
                   [have_sdlimage=yes],
                   [have_sdlimage=no])
-if test x$have_sdlimage = xno; then
+if test x$have_sdlimage = xyes; then
    SDLIMAGE_CFLAGS="$SDL_CFLAGS"
    SDLIMAGE_LIBS="$SDL_LIBS -lSDL_image -ljpeg"
    FREEJ_SAVE_FLAGS
@@ -841,20 +777,6 @@ if test x$have_sdlimage = xno; then
    FREEJ_CHECK_LIB_HEADER([SDL_image], [IMG_Load], [SDL_image.h],
                            [have_sdlimage=yes], [have_sdlimage=no])
    FREEJ_RESTORE_FLAGS
-fi
-if test x$have_sdlimage = xno; then
-   FREEJ_CHECK_LIB_HEADER([jpeg], [jpeg_std_error], [jpeglib.h],
-                           [have_libjpeg=yes], [have_libjpeg=no])
-   if test x$have_libjpeg = xno; then
-      AC_MSG_ERROR([*** Libjpeg development files are required to build static SDL_image])
-   fi
-   PKG_CHECK_MODULES(LIBPNG, libpng, have_libpng=yes, have_libpng=no)
-   if test x$have_libpng = xno; then
-      AC_MSG_ERROR([*** Libpng development files are required to build static SDL_image])
-   fi
-
-   SDLIMAGE_CFLAGS="-I\$(top_srcdir)/lib/sdl_image"
-   SDLIMAGE_LIBS="-lpng -ljpeg \$(top_builddir)/lib/sdl_image/libsdl_image.la"
 fi
 
 AM_CONDITIONAL([BUILD_SDLIMAGE], [test x$have_sdlimage = xno])
@@ -1016,11 +938,6 @@ dnl alphabetic order on dir/subdir, but Makefile sorts before everything
 AC_CONFIG_FILES([
 Makefile
 freej.pc
-bindings/Makefile
-bindings/java/Makefile
-bindings/perl/Makefile
-bindings/python/Makefile
-bindings/ruby/Makefile
 doc/Makefile
 doc/freej.dox
 doc/scripting/Makefile
@@ -1028,7 +945,6 @@ lib/Makefile
 lib/ccvt/Makefile
 lib/flash/Makefile
 lib/sdl_gfx/Makefile
-lib/sdl_image/Makefile
 lib/sdl_ttf/Makefile
 lib/slw/Makefile
 lib/javascript/GNUmakefile
@@ -1097,49 +1013,6 @@ VRB([= Shout library])
 VRB([  LIBS  : $SHOUT_LIBS])
 VRB([  CFLAGS: $SHOUT_CFLAGS])
 
-dnl #### bindings
-
-enabled_bindings=""
-disabled_bindings=""
-
-if test x$enable_python = xyes; then
-AS_VAR_APPEND(enabled_bindings, " python")
-INFO([= Python version $ac_python_version])
-VRB([    LIBS   : $PYTHON_LDFLAGS])
-VRB([    CFLAGS : $PYTHON_CPPFLAGS])
-else
-AS_VAR_APPEND(disabled_bindings, " python")
-fi
-
-if test x$enable_ruby = xyes; then
-AS_VAR_APPEND(enabled_bindings, " ruby")
-VRB([= Ruby:])
-VRB([    LIBS     : $RUBY_LDFLAGS])
-VRB([    CFLAGS   : $RUBY_CPPFLAGS])
-else
-AS_VAR_APPEND(disabled_bindings, " ruby")
-fi
-
-if test x$enable_java = xyes; then
-AS_VAR_APPEND(enabled_bindings, " java")
-VRB([= Java:])
-VRB([    LIBS     : $JAVA_LDFLAGS])
-VRB([    CFLAGS   : $JAVA_CFLAGS])
-else
-AS_VAR_APPEND(disabled_bindings, " java")
-fi
-
-if test x$enable_perl = xyes; then
-AS_VAR_APPEND(enabled_bindings, " perl")
-VRB([= Perl:])
-VRB([    LIBS     : $PERL_LDFLAGS])
-VRB([    CFLAGS   : $PERL_CFLAGS])
-else
-AS_VAR_APPEND(disabled_bindings, " perl")
-fi
-
-VRB([= Enabled language bindings  : $enabled_bindings])
-VRB([= Disabled language bindings : $disabled_bindings])
 
 
 dnl #### shipped libraries, can be static or dynamic
@@ -1170,8 +1043,6 @@ VRB([  CFLAGS: $SDLTTF_CFLAGS])
 
 if test x$have_sdlimage = xyes; then
 INFO([= SDL_image (dynamic)])
-else
-INFO([= SDL_image (static)])
 fi
 VRB([  LIBS  : $SDLIMAGE_LIBS])
 VRB([  CFLAGS: $SDLIMAGE_CFLAGS])
